@@ -91,14 +91,42 @@ jobs:
         run: |
           $exe = "C:\Program Files\Tailscale\tailscale.exe"
           if (-not (Test-Path $exe)) {
-            $dst = "$env:TEMP\tailscale-setup.exe"
+            Write-Host "Tailscale not found at $exe — attempting installer download + run..."
+            $dst = "$env:TEMP\tailscale-setup-latest.exe"
             if (-not (Test-Path $dst)) {
-              Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe' -OutFile $dst
+              Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe' -OutFile $dst -UseBasicParsing
             }
             Start-Process -FilePath $dst -ArgumentList "/quiet" -Wait
+
+            # poll for the EXE to appear (gives the installer a moment to finish)
+            $maxWait = 60        # seconds
+            $slept = 0
+            while (-not (Test-Path $exe) -and $slept -lt $maxWait) {
+              Start-Sleep -Seconds 2
+              $slept += 2
+            }
+
+            if (-not (Test-Path $exe)) {
+              Write-Warning "Installer did not create $exe within $maxWait seconds. Trying Chocolatey install as fallback..."
+              choco install -y tailscale
+              # allow a bit for choco to place files
+              $maxWait2 = 60
+              $slept = 0
+              while (-not (Test-Path $exe) -and $slept -lt $maxWait2) {
+                Start-Sleep -Seconds 2
+                $slept += 2
+              }
+            }
           }
-          Start-Service Tailscale -ErrorAction SilentlyContinue
-          & "C:\Program Files\Tailscale\tailscale.exe" version
+
+          if (Test-Path $exe) {
+            Start-Service Tailscale -ErrorAction SilentlyContinue
+            & $exe version
+          } else {
+            Write-Error "Tailscale executable still missing at: $exe. Directory listing:"
+            Get-ChildItem "C:\Program Files\Tailscale" -Force -ErrorAction SilentlyContinue | Format-Table -AutoSize
+            exit 1
+          }
 
       - name: 📦 Restore WinRAR cache
         id: cache-winrar-restore
