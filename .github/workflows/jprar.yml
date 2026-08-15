@@ -257,12 +257,22 @@ jobs:
 
                 $filesDir = "$extractDir\Files"
 
-                # 3. Auto-install IDM (Build 1f) silently
-                $idmInstaller = "$filesDir\idman643build1f.exe"
-                if (Test-Path $idmInstaller) {
-                  Write-Host "Installing IDM silently..."
-                  Start-Process -FilePath $idmInstaller -ArgumentList "/s" -Wait
-                }
+# 3. Auto-install IDM (Build 1f) with non-blocking process handle
+$idmInstaller = "$filesDir\idman643build1f.exe"
+if (Test-Path $idmInstaller) {
+  Write-Host "Installing IDM silently..."
+  $proc = Start-Process -FilePath $idmInstaller -ArgumentList "/s" -PassThru
+  
+  # Wait up to 30 seconds max for installer to finish
+  if (-not $proc.WaitForExit(30000)) {
+    Write-Host "Installer execution time exceeded, releasing process handle..."
+  }
+
+  # Kill lingering background handles spawned by IDM installer
+  Get-Process -Name "idman643build1f", "IDMan", "IEMonitor" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  Write-Host "IDM installation step completed."
+}
+
 
                 # 4. Auto-launch IDM Patch Executable on screen
                 $idmPatch = "$filesDir\IDM_6.4x_Crack_v20.6.exe"
