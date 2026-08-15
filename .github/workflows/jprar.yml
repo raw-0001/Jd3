@@ -361,13 +361,14 @@ jobs:
           $end = (Get-Date).AddMinutes($mins)
           while ((Get-Date) -lt $end) {
             $ts = $end - (Get-Date)
-            $hrs = [math]::Floor($ts.TotalHours)
-            $remMins = $ts.Minutes
+            $hrs = [int][math]::Floor($ts.TotalHours)
+            $remMins = [int]$ts.Minutes
             $formatted = "{0:D2}h:{1:D2}m remaining" -f $hrs, $remMins
             
             Write-Host "⏳ RDP Active | Time Left: $formatted"
             Start-Sleep -Seconds 180
           }
+
 
       - name: 🧹 PURGE any devices containing 'mitrixs' (exit)
         if: always()
